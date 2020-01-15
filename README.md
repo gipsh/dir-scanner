@@ -4,6 +4,8 @@ Scans a web server for hidden directories and files.
 
 You can customize the workers for speed.
 
+wordlists were stolen from OWASP 
+
 
 ## Build 
 
