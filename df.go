@@ -15,6 +15,7 @@ import (
 )
 
 var END_MESSAGE = "byebyebye"
+var TOR_PROXY   = "socks5://127.0.0.1:9050/"
 
 type Result struct {
 	Code int
@@ -65,7 +66,7 @@ func consumer(baseurl string, ch <-chan string, rc chan<- Result, id int, wg *sy
 		rc <- Result{response.StatusCode, fullurl}
 	}
 
-	fmt.Printf("Exit worker %d", id)
+//	fmt.Printf("Exit worker %d", id)
 
 }
 
@@ -108,8 +109,10 @@ func main() {
 	urlPtr := flag.String("url", "http://example.com:80", "url")
 	wordlistPtr := flag.String("wordlist", "common.txt", "wordlist file")
 	workersPtr := flag.Int("workers", 8, "workers")
+	torPtr := flag.Bool("tor",false,"use tor proxy on 127.0.0.1:9050")
 
 	flag.Parse()
+
 
 	if len(os.Args) < 2 {
 		fmt.Println("expected at least 'url' and 'wordlist'")
@@ -120,9 +123,14 @@ func main() {
 	file, _ := os.Open(*wordlistPtr)
 	lines, _ := lineCounter(file)
 
+
 	fmt.Println("[-] using url: ", *urlPtr)
 	fmt.Printf("[-] wordlist: %s [%d words]\n", *wordlistPtr, lines)
 	fmt.Println("[-] workers:", *workersPtr)
+	if (*torPtr)  {
+	  fmt.Println("[-] using tor ", TOR_PROXY)
+	  os.Setenv("HTTP_PROXY", TOR_PROXY)
+	}
 
 	var wg sync.WaitGroup
 	ch := make(chan string, 5)
