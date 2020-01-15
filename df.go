@@ -1,80 +1,67 @@
 package main
 
 import (
-        "fmt"
-        "log"
-        "net/http"
-        "os"
 	"bufio"
-	"time"
 	"flag"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
 	"sync"
-
+	"time"
 )
 
-func producer(ch chan<- string) {
+var END_MESSAGE = "byebyebye"
 
-    file, err := os.Open("./100.txt")
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer file.Close()
+func producer(ch chan<- string, wordlist string, workers int) {
 
-    scanner := bufio.NewScanner(file)
-    for scanner.Scan() {
-	ch <- scanner.Text()
-    }
+	file, err := os.Open(wordlist)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
 
-    if err := scanner.Err(); err != nil {
-        log.Fatal(err)
-    }
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		ch <- scanner.Text()
+	}
 
-   fmt.Println("producer done")
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	for i := 0; i < workers; i++ {
+		ch <- END_MESSAGE
+	}
+
+	fmt.Println("producer done")
 }
 
-func consumer(baseurl string, ch <-chan string,  id int,  wg *sync.WaitGroup) {
+func consumer(baseurl string, ch <-chan string, id int, wg *sync.WaitGroup) {
 
 	defer wg.Done()
 	client := http.Client{
-	    Timeout: 3 * time.Second,
+		Timeout: 5 * time.Second,
 	}
 
-	for elem := range ch {
-         fullurl := fmt.Sprintf("%s/%s",baseurl,elem)
-         response, err := client.Get(fullurl)
-         if err != nil {
-                log.Fatal(err)
-         }
-	if (response.StatusCode != 400) {
-         fmt.Printf("[%d] %d %s\n",id, response.StatusCode, fullurl)
+	for {
+		elem := <-ch
+		if elem == END_MESSAGE {
+			break
+		}
+		fullurl := fmt.Sprintf("%s/%s", baseurl, elem)
+		response, err := client.Get(fullurl)
+		if err != nil {
+			log.Fatal(err)
+		}
+		//if response.StatusCode != 400 {
+		fmt.Printf("[%d] %d %s\n", id, response.StatusCode, fullurl)
+		//}
 	}
-      }
 
+	fmt.Printf("Exit worker %d", id)
 
 }
-
-func fanOutUnbuffered(ch <-chan string, size int) []chan string {
-    cs := make([]chan string, size)
-    for i, _ := range cs {
-        // The size of the channels buffer controls how far behind the recievers
-        // of the fanOut channels can lag the other channels.
-        cs[i] = make(chan string)
-    }
-    go func() {
-        for i := range ch {
-            for _, c := range cs {
-                c <- i
-            }
-        }
-        for _, c := range cs {
-            // close all our fanOut channels when the input channel is exhausted.
-            close(c)
-        }
-    }()
-    return cs
-}
-
-
 
 func main() {
 
@@ -82,29 +69,29 @@ func main() {
 
 	urlPtr := flag.String("url", "http://example.com:80", "url")
 	wordlistPtr := flag.String("wordlist", "common.txt", "wordlist file")
-        workersPtr := flag.Int("workers", 3, "workers")
+	workersPtr := flag.Int("workers", 3, "workers")
 
 	flag.Parse()
 
-	fmt.Println("word:", *urlPtr)
-    	fmt.Println("numb:", *wordlistPtr)
-    	fmt.Println("workers:", *workersPtr)
+	if len(os.Args) < 2 {
+		fmt.Println("expected at least 'url' and 'wordlist'")
+		flag.Usage()
+		os.Exit(1)
+	}
 
-    	if len(os.Args) < 2 {
-       	  fmt.Println("expected at least 'url' and 'wordlist'")
-      	  os.Exit(1)
-    	}
-    
+	fmt.Println("[-] using url: ", *urlPtr)
+	fmt.Println("[-] wordlist: ", *wordlistPtr)
+	fmt.Println("[-] workers:", *workersPtr)
+
 	var wg sync.WaitGroup
-	ch := make(chan string,5)
+	ch := make(chan string, 5)
 
 	for i := 0; i < *workersPtr; i++ {
 		wg.Add(1)
-		go consumer("http://18.215.172.153:3001", ch, i, &wg)
-		
+		go consumer(*urlPtr, ch, i, &wg)
 	}
 
-	go producer(ch)
+	go producer(ch, *wordlistPtr, *workersPtr)
 
 	wg.Wait()
 }
