@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io"
@@ -51,6 +52,7 @@ func producer(ch chan<- string, wordlist string, workers int) {
 func consumer(baseurl string, ch <-chan string, rc chan<- Result, id int, uarr bool, wg *sync.WaitGroup) {
 
 	defer wg.Done()
+
 	client := http.Client{
 		Timeout: 5 * time.Second,
 	}
@@ -66,20 +68,23 @@ func consumer(baseurl string, ch <-chan string, rc chan<- Result, id int, uarr b
 		req, err := http.NewRequest("GET", fullurl, nil)
 		if err != nil {
 			log.Println(err)
-		} else {
+			continue
 
-			if uarr {
-				req.Header.Set("User-Agent", GetUAManager().GetUserAgent())
-			}
-			response, err := client.Do(req)
-
-			if err != nil {
-				//log.Fatal(err)
-				log.Println(err)
-			} else {
-				rc <- Result{response.StatusCode, fullurl}
-			}
 		}
+
+		if uarr {
+			req.Header.Set("User-Agent", GetUAManager().GetUserAgent())
+		}
+
+		response, err := client.Do(req)
+
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		rc <- Result{response.StatusCode, fullurl}
+
 	}
 
 	//	fmt.Printf("Exit worker %d", id)
@@ -127,6 +132,7 @@ func main() {
 	workersPtr := flag.Int("workers", 8, "workers")
 	torPtr := flag.Bool("tor", false, "use tor proxy on 127.0.0.1:9050")
 	uarrPtr := flag.Bool("uarr", true, "User-Agent round robin")
+	insecurePtr := flag.Bool("insecure", true, "TLS no certificate validation")
 
 	flag.Parse()
 
@@ -149,7 +155,10 @@ func main() {
 	if *uarrPtr {
 		fmt.Println("[-] User-Agent round robin enabled")
 		GetUAManager()
-
+	}
+	if *insecurePtr {
+		fmt.Println("[-] TLS certificate validation is disabled")
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 
 	var wg sync.WaitGroup
