@@ -2,10 +2,17 @@
 
 Scans a web server for hidden directories and files.
 
-You can customize the workers for speed.
 
-wordlists were stolen from OWASP 
 
+## Features
+
+You can customize the workers for speed with `-workers`.
+
+You can route the requests throught TOR proxy with `-tor`
+
+The User-Agent changes for each request, you can disable this behaviour with `-uarr=false`
+
+Wordlists were stolen from OWASP 
 
 ## Build 
 
