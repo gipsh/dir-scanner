@@ -60,22 +60,26 @@ func consumer(baseurl string, ch <-chan string, rc chan<- Result, id int, uarr b
 		if elem == END_MESSAGE {
 			break
 		}
+
 		fullurl := fmt.Sprintf("%s/%s", baseurl, elem)
 
 		req, err := http.NewRequest("GET", fullurl, nil)
 		if err != nil {
-			log.Fatalln(err)
-		}
+			log.Println(err)
+		} else {
 
-		if uarr {
-			req.Header.Set("User-Agent", GetUAManager().GetUserAgent())
-		}
-		response, err := client.Do(req)
+			if uarr {
+				req.Header.Set("User-Agent", GetUAManager().GetUserAgent())
+			}
+			response, err := client.Do(req)
 
-		if err != nil {
-			log.Fatal(err)
+			if err != nil {
+				//log.Fatal(err)
+				log.Println(err)
+			} else {
+				rc <- Result{response.StatusCode, fullurl}
+			}
 		}
-		rc <- Result{response.StatusCode, fullurl}
 	}
 
 	//	fmt.Printf("Exit worker %d", id)
