@@ -18,21 +18,21 @@ func fastconsumer(ch <-chan string, rc chan<- Result, id int, config ScannerConf
 		fasthttp.ReleaseResponse(res)
 	}()
 
+	var c *fasthttp.Client
+
+	if *config.Tor {
+		c = &fasthttp.Client{
+			Dial: fasthttpproxy.FasthttpSocksDialer(TOR_PROXY),
+		}
+	} else {
+		c = &fasthttp.Client{}
+
+	}
+
 	for {
 		elem := <-ch
 		if elem == END_MESSAGE {
 			break
-		}
-
-		var c *fasthttp.Client
-
-		if *config.Tor {
-			c = &fasthttp.Client{
-				Dial: fasthttpproxy.FasthttpSocksDialer(TOR_PROXY),
-			}
-		} else {
-			c = &fasthttp.Client{}
-
 		}
 
 		fullurl := fmt.Sprintf("%s/%s", *config.Url, elem)
