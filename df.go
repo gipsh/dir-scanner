@@ -25,9 +25,19 @@ type Result struct {
 	Word string
 }
 
-func producer(ch chan<- string, wordlist string, workers int) {
+type ScannerConfig struct {
+	Url      *string
+	Wordlist *string
+	Workers  *int
+	Tor      *bool
+	Uarr     *bool
+	Insecure *bool
+	Fasthttp *bool
+}
 
-	file, err := os.Open(wordlist)
+func producer(ch chan<- string, config ScannerConfig) {
+
+	file, err := os.Open(*config.Wordlist)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -42,14 +52,14 @@ func producer(ch chan<- string, wordlist string, workers int) {
 		log.Fatal(err)
 	}
 
-	for i := 0; i < workers; i++ {
+	for i := 0; i < *config.Workers; i++ {
 		ch <- END_MESSAGE
 	}
 
 	// fmt.Println("producer done")
 }
 
-func consumer(baseurl string, ch <-chan string, rc chan<- Result, id int, uarr bool, wg *sync.WaitGroup) {
+func consumer(ch <-chan string, rc chan<- Result, id int, config ScannerConfig, wg *sync.WaitGroup) {
 
 	defer wg.Done()
 
@@ -63,7 +73,7 @@ func consumer(baseurl string, ch <-chan string, rc chan<- Result, id int, uarr b
 			break
 		}
 
-		fullurl := fmt.Sprintf("%s/%s", baseurl, elem)
+		fullurl := fmt.Sprintf("%s/%s", *config.Url, elem)
 
 		req, err := http.NewRequest("GET", fullurl, nil)
 		if err != nil {
@@ -72,7 +82,7 @@ func consumer(baseurl string, ch <-chan string, rc chan<- Result, id int, uarr b
 
 		}
 
-		if uarr {
+		if *config.Uarr {
 			req.Header.Set("User-Agent", GetUAManager().GetUserAgent())
 		}
 
@@ -127,12 +137,15 @@ func main() {
 
 	fmt.Println("--[dir-scanner]--\n")
 
-	urlPtr := flag.String("url", "http://example.com:80", "url")
-	wordlistPtr := flag.String("wordlist", "common.txt", "wordlist file")
-	workersPtr := flag.Int("workers", 8, "workers")
-	torPtr := flag.Bool("tor", false, "use tor proxy on 127.0.0.1:9050")
-	uarrPtr := flag.Bool("uarr", true, "User-Agent round robin")
-	insecurePtr := flag.Bool("insecure", true, "TLS no certificate validation")
+	sc := ScannerConfig{}
+
+	sc.Url = flag.String("url", "http://example.com:80", "url")
+	sc.Wordlist = flag.String("wordlist", "common.txt", "wordlist file")
+	sc.Workers = flag.Int("workers", 8, "workers")
+	sc.Tor = flag.Bool("tor", false, "use tor proxy on 127.0.0.1:9050")
+	sc.Uarr = flag.Bool("uarr", true, "User-Agent round robin")
+	sc.Insecure = flag.Bool("insecure", true, "TLS no certificate validation")
+	sc.Fasthttp = flag.Bool("fasthttp", true, "User fasthttp library (they claim 10x faster)")
 
 	flag.Parse()
 
@@ -142,23 +155,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	file, _ := os.Open(*wordlistPtr)
+	file, _ := os.Open(*sc.Wordlist)
 	lines, _ := lineCounter(file)
 
-	fmt.Println("[-] using url: ", *urlPtr)
-	fmt.Printf("[-] wordlist: %s [%d words]\n", *wordlistPtr, lines)
-	fmt.Println("[-] workers:", *workersPtr)
-	if *torPtr {
+	fmt.Println("[-] using url: ", *sc.Url)
+	fmt.Printf("[-] wordlist: %s [%d words]\n", *sc.Wordlist, lines)
+	fmt.Println("[-] workers:", *sc.Workers)
+	if *sc.Tor {
 		fmt.Println("[-] using tor ", TOR_PROXY)
 		os.Setenv("HTTP_PROXY", TOR_PROXY)
 	}
-	if *uarrPtr {
+	if *sc.Uarr {
 		fmt.Println("[-] User-Agent round robin enabled")
 		GetUAManager()
 	}
-	if *insecurePtr {
+	if *sc.Insecure {
 		fmt.Println("[-] TLS certificate validation is disabled")
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+	if *sc.Fasthttp {
+		fmt.Println("[-] using fasthttp library instead of net/http")
 	}
 
 	var wg sync.WaitGroup
@@ -167,12 +183,16 @@ func main() {
 
 	go resultProcessor(rc, lines)
 
-	for i := 0; i < *workersPtr; i++ {
+	for i := 0; i < *sc.Workers; i++ {
 		wg.Add(1)
-		go consumer(*urlPtr, ch, rc, i, *uarrPtr, &wg)
+		if *sc.Fasthttp {
+			go fastconsumer(ch, rc, i, sc, &wg)
+		} else {
+			go consumer(ch, rc, i, sc, &wg)
+		}
 	}
 
-	go producer(ch, *wordlistPtr, *workersPtr)
+	go producer(ch, sc)
 
 	wg.Wait()
 }

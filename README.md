@@ -14,6 +14,8 @@ The User-Agent changes for each request, you can disable this behaviour with `-u
 
 Wordlists were stolen from OWASP 
 
+This tools has support for fasthttp library [https://github.com/valyala/fasthttp](https://github.com/valyala/fasthttp)
+
 ## Build 
 
 first get the deps
