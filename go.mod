@@ -1,0 +1,23 @@
+module github.com/gipsh/dir-scanner
+
+go 1.20
+
+require (
+	github.com/cheggaaa/pb/v3 v3.1.4
+	github.com/valyala/fasthttp v1.51.0
+)
+
+require (
+	github.com/VividCortex/ewma v1.2.0 // indirect
+	github.com/andybalholm/brotli v1.0.5 // indirect
+	github.com/fatih/color v1.15.0 // indirect
+	github.com/klauspost/compress v1.17.0 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.19 // indirect
+	github.com/mattn/go-runewidth v0.0.14 // indirect
+	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/valyala/bytebufferpool v1.0.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
+)
